@@ -1,0 +1,60 @@
+/* Room Booking System - Minimal Custom Styles */
+/* Most styling is now handled by Tailwind CSS */
+
+.room-booking-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
+/* Utility class for hiding scrollbar */
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+
+/* Smooth scroll behavior */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.4s ease-out;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+    .room-booking-container {
+        padding: 1rem 0.75rem;
+    }
+}
+
+/* Print styles */
+@media print {
+
+    .nav-tabs,
+    footer {
+        display: none;
+    }
+
+    .room-booking-container {
+        max-width: 100%;
+    }
+}

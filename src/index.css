@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Sarabun", sans-serif;
+}
+
+:root {
+  font-family: var(--font-sans);
+}
+
