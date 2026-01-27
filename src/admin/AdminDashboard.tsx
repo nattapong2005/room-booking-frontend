@@ -36,14 +36,14 @@ export default function AdminDashboard() {
         return {
           id: b.id,
           roomName: b.room?.name || 'Unknown Room',
-          userName: b.user?.fullName || 'Unknown User',
-          department: b.user?.role || '-', // Use role as department placeholder
+          userName: b.bookerName || b.user?.fullName || 'Unknown User',
+          department: b.departments?.name || b.department || b.user?.role || '-',
           date: start.toLocaleDateString('th-TH'),
           startTime: start.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
           endTime: end.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
           reason: b.purpose,
           status: b.status.toLowerCase(),
-          participants: '-', // Parsing from purpose would be complex, just show dash or part of purpose
+          participants: b.participants || '-',
           timestamp: b.createdAt
         };
       });

@@ -160,24 +160,23 @@ export default function UserLayout() {
 
   const handleBookingSubmit = async (data: any) => {
     try {
-      // Construct start and end DateTime strings
-      const startTime = new Date(`${data.date}T${data.startTime}`);
-      const endTime = new Date(`${data.date}T${data.endTime}`);
+      console.log("Booking Data from Form:", data);
 
-      // Backend missing 'participants' and 'phone', adding to description
-      const extendedPurpose = `${data.description} (ผู้เข้าร่วม: ${data.participants} คน, โทร: ${data.phone}, ชื่อผู้จอง: ${data.bookerName}, แผนก: ${data.department}, ตำแหน่ง: ${data.position})`;
-
+      // Ensure IDs are numbers if possible, as the backend previously expected numbers
+      const roomIdNum = Number(data.roomId);
+      const departmentIdNum = Number(data.department);
+      
       const payload = {
-        roomId: data.roomId,
-        startTime: startTime.toISOString(),
-        endTime: endTime.toISOString(),
-        purpose: extendedPurpose,
-        roomSetup: data.seatingType,
-        equipments: data.equipment.map((id: string) => ({
-          equipmentId: id,
-          quantity: 1
+        ...data,
+        roomId: isNaN(roomIdNum) ? data.roomId : roomIdNum,
+        department: isNaN(departmentIdNum) ? data.department : departmentIdNum,
+        equipments: data.equipments.map((eq: any) => ({
+          ...eq,
+          equipmentId: !isNaN(Number(eq.equipmentId)) ? Number(eq.equipmentId) : eq.equipmentId
         }))
       };
+
+      console.log("Final Booking Payload:", payload);
 
       await bookingService.createBooking(payload);
       Alert.success("บันทึกสำเร็จ", "การจองของคุณถูกบันทึกเรียบร้อยแล้ว");

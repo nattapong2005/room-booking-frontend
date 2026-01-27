@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { AlertTriangle, Trash2, Calendar, Clock, MapPin } from "lucide-react";
+import { AlertTriangle, Trash2, Calendar, Clock, MapPin, Loader2, ArrowRight } from "lucide-react";
 import { bookingService } from "../services/bookingService";
 import { Alert } from "../utils/sweetAlert";
 
@@ -24,7 +24,6 @@ export default function EditCancelBooking() {
     try {
       setLoading(true);
       const response = await bookingService.getAllBookings();
-      // Filter for PENDING or APPROVED and future dates
       const now = new Date();
       const active = response.data
         .filter((b: any) => {
@@ -36,7 +35,7 @@ export default function EditCancelBooking() {
         })
         .map((b: any) => ({
           id: b.id,
-          roomName: b.room?.name || "Unknown Room",
+          roomName: b.room?.name || "ไม่ระบุห้อง",
           purpose: b.purpose,
           startTime: b.startTime,
           endTime: b.endTime,
@@ -62,7 +61,7 @@ export default function EditCancelBooking() {
       try {
         await bookingService.cancelBooking(id);
         Alert.success("ยกเลิกสำเร็จ", "การจองของคุณถูกยกเลิกแล้ว");
-        fetchActiveBookings(); // Refresh list
+        fetchActiveBookings(); 
       } catch (error: any) {
         Alert.error("เกิดข้อผิดพลาด", error.response?.data?.message || "ไม่สามารถยกเลิกการจองได้");
       }
@@ -70,77 +69,63 @@ export default function EditCancelBooking() {
   };
 
   if (loading) {
-    return <div className="text-center py-10 text-gray-500">กำลังโหลดข้อมูล...</div>;
+    return (
+      <div className="bg-white rounded-3xl p-12 shadow-sm border border-gray-100 flex flex-col items-center justify-center gap-3">
+        <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
+        <p className="text-gray-400 font-medium text-xs">กำลังโหลด...</p>
+      </div>
+    );
   }
 
   return (
-    <div className="bg-white rounded-3xl p-5 md:p-8 shadow-xl border border-gray-100 animate-fade-in max-w-4xl mx-auto">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
-        <div className="flex items-center gap-3">
-          <div className="w-2 h-8 bg-rose-500 rounded-full"></div>
-          <h2 className="text-2xl md:text-3xl font-black text-gray-800 tracking-tight">จัดการรายการจอง</h2>
+    <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-gray-100 animate-fade-in max-w-4xl mx-auto">
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h2 className="text-xl md:text-2xl font-bold text-gray-800 tracking-tight">จัดการรายการจอง</h2>
+          <p className="text-gray-500 text-sm mt-1">รายการจองในอนาคต</p>
         </div>
-        <p className="text-gray-400 font-bold text-xs md:text-sm uppercase tracking-widest max-w-[300px] md:text-right">
-          รายการที่สามารถยกเลิกได้ (เฉพาะรายการที่ยังมาไม่ถึง)
-        </p>
       </div>
 
       {bookings.length > 0 ? (
-        <div className="grid grid-cols-1 gap-6">
+        <div className="space-y-4">
           {bookings.map((booking) => {
             const start = new Date(booking.startTime);
             const end = new Date(booking.endTime);
             const dateStr = start.toLocaleDateString("th-TH", {
-              year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
+              day: 'numeric', month: 'short', year: 'numeric'
             });
             const timeStr = `${start.toLocaleTimeString("th-TH", { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString("th-TH", { hour: '2-digit', minute: '2-digit' })}`;
 
             return (
-              <div key={booking.id} className="group relative bg-gray-50/50 rounded-3xl p-6 border border-gray-100 hover:bg-white hover:shadow-2xl hover:shadow-rose-900/5 transition-all duration-300">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                  <div className="flex-1 space-y-4">
-                    <div className="flex items-center gap-2">
-                        <span className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-full border shadow-sm ${
-                            booking.status === 'APPROVED' 
-                            ? 'bg-green-50 text-green-600 border-green-100' 
-                            : 'bg-amber-50 text-amber-600 border-amber-100'
-                        }`}>
-                            {booking.status === 'APPROVED' ? 'อนุมัติแล้ว' : 'รออนุมัติ'}
-                        </span>
+              <div key={booking.id} className="group bg-white rounded-2xl border border-gray-100 hover:border-rose-100 hover:shadow-md transition-all duration-200 p-5">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                  <div className="space-y-2 flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                       <span className={`w-2 h-2 rounded-full ${booking.status === 'APPROVED' ? 'bg-green-500' : 'bg-amber-500'}`}></span>
+                       <span className="text-xs font-medium text-gray-500">
+                         {booking.status === 'APPROVED' ? 'อนุมัติแล้ว' : 'รออนุมัติ'}
+                       </span>
+                       <span className="text-gray-300 mx-1">•</span>
+                       <span className="text-xs font-medium text-gray-500">{dateStr}</span>
+                       <span className="text-gray-300 mx-1">•</span>
+                       <span className="text-xs font-medium text-gray-500">{timeStr}</span>
                     </div>
                     
-                    <h3 className="font-black text-xl text-gray-800 group-hover:text-rose-500 transition-colors leading-tight">
-                      {booking.purpose}
-                    </h3>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="flex items-center gap-3 bg-white p-2.5 rounded-2xl border border-gray-100 shadow-sm">
-                        <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500">
-                          <MapPin size={16} />
-                        </div>
-                        <span className="text-sm font-bold text-gray-600">{booking.roomName}</span>
-                      </div>
-                      <div className="flex items-center gap-3 bg-white p-2.5 rounded-2xl border border-gray-100 shadow-sm">
-                        <div className="w-8 h-8 rounded-xl bg-purple-50 flex items-center justify-center text-purple-500">
-                          <Calendar size={16} />
-                        </div>
-                        <span className="text-sm font-bold text-gray-600">{dateStr}</span>
-                      </div>
-                      <div className="flex items-center gap-3 bg-white p-2.5 rounded-2xl border border-gray-100 shadow-sm sm:col-span-2">
-                        <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500">
-                          <Clock size={16} />
-                        </div>
-                        <span className="text-sm font-bold text-gray-600">{timeStr}</span>
+                    <div>
+                      <h3 className="text-base font-bold text-gray-800 line-clamp-1">{booking.purpose}</h3>
+                      <div className="flex items-center gap-1.5 mt-1 text-sm text-gray-500">
+                         <MapPin size={14} className="text-gray-400" />
+                         <span>{booking.roomName}</span>
                       </div>
                     </div>
                   </div>
-                  
+
                   <button
                     onClick={() => handleCancel(booking.id)}
-                    className="w-full md:w-auto px-8 py-4 bg-white border-2 border-rose-100 text-rose-500 rounded-2xl hover:bg-rose-500 hover:text-white hover:border-rose-500 transition-all duration-300 flex items-center justify-center gap-3 text-sm font-black uppercase tracking-widest shadow-lg shadow-rose-900/5 active:scale-95"
+                    className="w-full sm:w-auto px-4 py-2 bg-transparent text-rose-500 text-xs font-bold border border-rose-200 rounded-lg hover:bg-rose-50 hover:border-rose-300 transition-colors flex items-center justify-center gap-2"
                   >
-                    <Trash2 size={18} />
-                    ยกเลิกการจอง
+                    <Trash2 size={14} />
+                    ยกเลิก
                   </button>
                 </div>
               </div>
@@ -148,12 +133,12 @@ export default function EditCancelBooking() {
           })}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-20 bg-gray-50/50 rounded-3xl border-2 border-dashed border-gray-200">
-          <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-xl mb-6 transform -rotate-6">
-            <AlertTriangle className="h-10 w-10 text-gray-300" />
+        <div className="text-center py-16">
+          <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Calendar className="h-8 w-8 text-gray-300" />
           </div>
-          <h3 className="text-xl font-black text-gray-800 tracking-tight">ไม่มีรายการจองที่สามารถยกเลิกได้</h3>
-          <p className="text-gray-400 font-bold text-sm mt-2 uppercase tracking-widest">คุณไม่มีรายการจองในอนาคต</p>
+          <h3 className="text-lg font-bold text-gray-700">ไม่มีรายการจอง</h3>
+          <p className="text-gray-400 text-sm mt-1">ไม่มีรายการจองที่สามารถยกเลิกได้ในขณะนี้</p>
         </div>
       )}
     </div>

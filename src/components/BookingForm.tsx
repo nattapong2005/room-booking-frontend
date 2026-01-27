@@ -42,12 +42,12 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
     phone: "",
     roomId: "",
     date: "",
-    participants: "",
+    participants: 1,
     startTime: "",
     endTime: "",
-    seatingType: "", // open_space, u_shape, classroom
-    equipment: [] as string[],
-    description: "",
+    roomSetup: "", // open_space, u_shape, classroom
+    equipments: [] as string[],
+    purpose: "",
   });
 
   useEffect(() => {
@@ -60,7 +60,7 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
         if (user?.departmentId) {
           const userDept = response.data.find((d: any) => d.id === user.departmentId);
           if (userDept) {
-            setFormData(prev => ({ ...prev, department: userDept.name }));
+            setFormData(prev => ({ ...prev, department: userDept.id }));
           }
         }
       } catch (error) {
@@ -78,7 +78,10 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ 
+      ...prev, 
+      [name]: name === "participants" ? Number(value) : value 
+    }));
   };
 
   // จัดการ Checkbox อุปกรณ์
@@ -86,9 +89,9 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
     const { value, checked } = e.target;
     setFormData((prev) => {
       if (checked) {
-        return { ...prev, equipment: [...prev.equipment, value] };
+        return { ...prev, equipments: [...prev.equipments, value] };
       } else {
-        return { ...prev, equipment: prev.equipment.filter((item) => item !== value) };
+        return { ...prev, equipments: prev.equipments.filter((item) => item !== value) };
       }
     });
   };
@@ -123,19 +126,36 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
     }
 
     // 3. ตรวจสอบรูปแบบการจัดที่นั่ง
-    if (!formData.seatingType) {
+    if (!formData.roomSetup) {
       Alert.error("ข้อมูลไม่ครบถ้วน", "กรุณาเลือกรูปแบบการจัดที่นั่ง");
       return;
     }
 
     // 4. ตรวจสอบความยาวจุดประสงค์ (DB VARCHAR 191)
-    const suffixLength = 150; // ประมาณการความยาวของชื่อ/แผนก/โทร ที่จะถูกรวมเข้าไป
-    if (formData.description.length + suffixLength > 190) {
+    if (formData.purpose.length > 190) {
       Alert.warning("ข้อความยาวเกินไป", "กรุณาย่อจุดประสงค์การใช้งานลงเพื่อให้สามารถบันทึกข้อมูลได้");
       return;
     }
 
-    onSubmit(formData);
+    // Transform to target JSON structure
+    const payload = {
+      roomId: formData.roomId,
+      startTime: start.toISOString(),
+      endTime: end.toISOString(),
+      participants: formData.participants,
+      phone: formData.phone,
+      bookerName: formData.bookerName,
+      position: formData.position,
+      department: formData.department,
+      purpose: formData.purpose,
+      roomSetup: formData.roomSetup,
+      equipments: formData.equipments.map((id) => ({
+        equipmentId: id,
+        quantity: 1
+      }))
+    };
+
+    onSubmit(payload);
   };
 
   return (
@@ -178,7 +198,7 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
             >
               <option value="">เลือกฝ่ายงาน / แผนก</option>
               {departments.map((dept) => (
-                <option key={dept.id} value={dept.name}>
+                <option key={dept.id} value={dept.id}>
                   {dept.name}
                 </option>
               ))}
@@ -329,15 +349,15 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
               <label 
                 key={option.value} 
                 className={`flex items-center justify-center p-4 rounded-2xl border-2 transition-all cursor-pointer text-center
-                  ${formData.seatingType === option.value 
+                  ${formData.roomSetup === option.value 
                     ? "border-blue-500 bg-blue-50 text-blue-700 shadow-md ring-2 ring-blue-500/20" 
                     : "border-gray-100 bg-gray-50/50 text-gray-500 hover:border-gray-200 hover:bg-white"}`}
               >
                 <input
                   type="radio"
-                  name="seatingType"
+                  name="roomSetup"
                   value={option.value}
-                  checked={formData.seatingType === option.value}
+                  checked={formData.roomSetup === option.value}
                   onChange={handleChange}
                   required
                   className="hidden"
@@ -358,14 +378,14 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
               <label 
                 key={item.id} 
                 className={`flex items-center gap-3 p-3 rounded-2xl border-2 transition-all cursor-pointer
-                  ${formData.equipment.includes(item.id.toString())
+                  ${formData.equipments.includes(item.id.toString())
                     ? "border-blue-500 bg-blue-50 text-blue-700 shadow-sm"
                     : "border-gray-100 bg-gray-50/50 text-gray-500 hover:border-gray-200 hover:bg-white"}`}
               >
                 <input
                   type="checkbox"
                   value={item.id}
-                  checked={formData.equipment.includes(item.id.toString())}
+                  checked={formData.equipments.includes(item.id.toString())}
                   onChange={handleCheckboxChange}
                   className="w-5 h-5 rounded-lg text-blue-600 border-gray-300 focus:ring-blue-500"
                 />
@@ -377,22 +397,22 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
 
         {/* รายละเอียดเพิ่มเติม */}
         <div className="space-y-2">
-          <label htmlFor="description" className="block text-sm font-bold text-gray-600 uppercase tracking-wider ml-1">
+          <label htmlFor="purpose" className="block text-sm font-bold text-gray-600 uppercase tracking-wider ml-1">
             จุดประสงค์การใช้งาน / รายละเอียดเพิ่มเติม
           </label>
           <textarea
-            id="description"
-            name="description"
-            value={formData.description}
+            id="purpose"
+            name="purpose"
+            value={formData.purpose}
             onChange={handleChange}
             rows={3}
-            maxLength={100}
+            maxLength={190}
             className="w-full rounded-2xl border border-gray-200 bg-gray-50/50 px-4 py-3.5 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white transition-all"
             placeholder="กรุณาระบุจุดประสงค์การใช้งาน"
           />
           <div className="flex justify-end pr-2">
-            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${formData.description.length >= 90 ? 'bg-rose-100 text-rose-600' : 'bg-gray-100 text-gray-400'}`}>
-              {formData.description.length}/100
+            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${formData.purpose.length >= 170 ? 'bg-rose-100 text-rose-600' : 'bg-gray-100 text-gray-400'}`}>
+              {formData.purpose.length}/190
             </span>
           </div>
         </div>
