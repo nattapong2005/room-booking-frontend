@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { departmentService } from "../services/departmentService";
+import { bookingService } from "../services/bookingService";
 import { Alert } from "../utils/sweetAlert";
 
 interface Room {
@@ -18,6 +19,14 @@ interface Department {
   name: string;
 }
 
+interface Booking {
+  id: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+  bookerName?: string;
+}
+
 interface BookingFormProps {
   rooms: Room[];
   equipments: Equipment[];
@@ -30,6 +39,8 @@ const POSITIONS = ["ผู้อำนวยการ", "รองผู้อ�
 
 export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: BookingFormProps) {
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [existingBookings, setExistingBookings] = useState<Booking[]>([]);
+  const [loadingBookings, setLoadingBookings] = useState(false);
   
   // ดึงข้อมูลผู้ใช้จาก localStorage เพื่อ pre-fill
   const userStr = localStorage.getItem("user");
@@ -70,6 +81,30 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
     fetchDepartments();
   }, []);
 
+  useEffect(() => {
+    const fetchBookings = async () => {
+      if (formData.roomId && formData.date) {
+        setLoadingBookings(true);
+        try {
+          const response = await bookingService.getBookingsByRoom(formData.roomId, formData.date);
+          setExistingBookings(response.data);
+        } catch (error) {
+          console.error("Failed to fetch bookings:", error);
+        } finally {
+          setLoadingBookings(false);
+        }
+      } else {
+        setExistingBookings([]);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      fetchBookings();
+    }, 500); // Debounce
+
+    return () => clearTimeout(timer);
+  }, [formData.roomId, formData.date]);
+
   // กรองห้องที่พร้อมใช้งาน (isActive: true)
   const availableRooms = rooms.filter(room => room.status === "available");
 
@@ -94,6 +129,10 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
         return { ...prev, equipments: prev.equipments.filter((item) => item !== value) };
       }
     });
+  };
+
+  const formatTime = (isoString: string) => {
+    return new Date(isoString).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -122,6 +161,24 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
 
     if (start >= end) {
       Alert.error("เวลาไม่ถูกต้อง", "เวลาเริ่มต้องก่อนเวลาสิ้นสุด");
+      return;
+    }
+
+    // Check for overlap with existing bookings (Client-side pre-check)
+    const isOverlapping = existingBookings.some(booking => {
+      const bookingStart = new Date(booking.startTime);
+      const bookingEnd = new Date(booking.endTime);
+      
+      // Cancelled bookings don't count
+      if (booking.status === 'CANCELLED' || booking.status === 'REJECTED') return false;
+
+      return (
+        (start < bookingEnd && end > bookingStart)
+      );
+    });
+
+    if (isOverlapping) {
+      Alert.error("เวลาไม่ถูกต้อง", "ช่วงเวลาที่เลือกมีการจองแล้ว กรุณาเลือกเวลาใหม่");
       return;
     }
 
@@ -286,6 +343,48 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
             />
           </div>
         </div>
+
+        {/* ตารางแสดงการจองที่มีอยู่ */}
+        {formData.roomId && formData.date && (
+          <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
+             <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+              </svg>
+              สถานะการจองในวันที่เลือก
+            </h3>
+            {loadingBookings ? (
+              <div className="text-sm text-gray-500 animate-pulse">กำลังโหลดข้อมูล...</div>
+            ) : existingBookings.length > 0 ? (
+              <div className="space-y-2">
+                {existingBookings.map((booking) => (
+                  <div key={booking.id} className="flex items-center justify-between bg-white p-3 rounded-xl border border-gray-200 shadow-sm text-sm">
+                    <div className="flex flex-col">
+                       <span className="font-bold text-gray-800">
+                        {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
+                       </span>
+                       <span className="text-xs text-gray-500">โดย: {booking.bookerName || "ไม่ระบุ"}</span>
+                    </div>
+                    <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
+                      booking.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 
+                      booking.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      {booking.status === 'APPROVED' ? 'อนุมัติแล้ว' : 'รออนุมัติ'}
+                    </span>
+                  </div>
+                ))}
+                <div className="text-xs text-red-500 mt-2 font-bold">* ช่วงเวลาที่มีการจองแล้วจะไม่สามารถเลือกได้</div>
+              </div>
+            ) : (
+              <div className="text-sm text-green-600 font-bold bg-green-50 p-2 rounded-lg border border-green-100 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                ว่างตลอดทั้งวัน
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Row 4: ผู้เข้าร่วม / เวลา */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
