@@ -118,7 +118,6 @@ export default function UserLayout() {
 
     for (let day = 1; day <= daysInMonth; day++) {
       const isWeekend = (firstDay + day - 1) % 7 === 0 || (firstDay + day - 1) % 7 === 6;
-      const dayDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
       
       const bookingsForDay = allBookings.filter(b => {
         const bStart = new Date(b.startTime);

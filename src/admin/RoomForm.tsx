@@ -33,7 +33,6 @@ export default function RoomForm() {
   const [loading, setLoading] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [existingImages, setExistingImages] = useState<RoomImage[]>([]);
 
   // Get the base URL for images by stripping /api/v1
   const getBaseOrigin = () => {
@@ -62,7 +61,6 @@ export default function RoomForm() {
         description: room.description || "",
         isActive: room.isActive
       });
-      setExistingImages(room.images || []);
       
       if (room.images && room.images.length > 0) {
           const fullUrl = room.images[0].url.startsWith('http') 
@@ -228,7 +226,6 @@ export default function RoomForm() {
                                 onClick={() => {
                                     setImagePreview(null);
                                     setImageFile(null);
-                                    if (isEditMode) setExistingImages([]);
                                 }}
                                 className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-md"
                             >

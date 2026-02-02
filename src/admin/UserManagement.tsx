@@ -149,7 +149,7 @@ export default function UserManagement() {
     user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (user.department && user.department.toLowerCase().includes(searchTerm.toLowerCase()))
+    (user.department?.name && user.department.name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
@@ -211,7 +211,7 @@ export default function UserManagement() {
                         </div>
                       </td>
                       <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                        <div className="text-[11px] md:text-sm text-gray-900">{user.department || '-'}</div>
+                        <div className="text-[11px] md:text-sm text-gray-900">{user.department?.name || '-'}</div>
                       </td>
                       <td className="hidden md:table-cell px-4 md:px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 inline-flex text-[10px] md:text-xs leading-5 font-semibold rounded-full ${

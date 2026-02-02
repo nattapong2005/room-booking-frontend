@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Alert } from "../utils/sweetAlert";
-import { Save, Plus, Trash2, Edit2, Layout, Briefcase, Settings as SettingsIcon } from "lucide-react";
+import { Save, Plus, Trash2, Layout, Briefcase, Settings as SettingsIcon } from "lucide-react";
 import { systemService } from "../services/systemService";
 import Swal from 'sweetalert2';
 

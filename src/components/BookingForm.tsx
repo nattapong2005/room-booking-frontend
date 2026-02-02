@@ -107,7 +107,7 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel, ini
   }, [formData.roomId, formData.date]);
 
   // กรองห้องที่พร้อมใช้งาน (isActive: true)
-  const availableRooms = rooms.filter(room => room.isActive || room.status === 'available');
+  const availableRooms = rooms.filter(room => room.status === 'available');
 
   // จัดการ Input ทั่วไป
   const handleChange = (
@@ -127,7 +127,7 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel, ini
       if (checked) {
         return { ...prev, equipments: [...prev.equipments, value] };
       } else {
-        return { ...prev, equipments: prev.equipments.filter((item) => item !== value) };
+        return { ...prev, equipments: prev.equipments.filter((item: string) => item !== value) };
       }
     });
   };
@@ -207,7 +207,7 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel, ini
       department: formData.department,
       purpose: formData.purpose,
       roomSetup: formData.roomSetup,
-      equipments: formData.equipments.map((id) => ({
+      equipments: formData.equipments.map((id: string) => ({
         equipmentId: id,
         quantity: 1
       }))

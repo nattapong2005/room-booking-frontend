@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { AlertTriangle, Trash2, Calendar, Clock, MapPin, Loader2, ArrowRight } from "lucide-react";
+import { Trash2, Calendar, MapPin, Loader2 } from "lucide-react";
 import { bookingService } from "../services/bookingService";
 import { Alert } from "../utils/sweetAlert";
 
