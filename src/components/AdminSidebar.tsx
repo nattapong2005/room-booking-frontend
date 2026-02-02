@@ -85,10 +85,10 @@ export default function AdminSidebar({ isOpen, setIsOpen }: AdminSidebarProps) {
 
       <NavItem 
         icon={<Calendar size={20} />} 
-        label="ปฏิทินการจอง" 
-        isActive={location.pathname === '/admin/calendar'} 
+        label="จัดการการจอง" 
+        isActive={location.pathname === '/admin/bookings'} 
         isOpen={isOpen}
-        onClick={() => handleNavigate('/admin/calendar')}
+        onClick={() => handleNavigate('/admin/bookings')}
       />
       <NavItem 
         icon={<Settings size={20} />} 

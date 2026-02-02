@@ -32,12 +32,13 @@ interface BookingFormProps {
   equipments: Equipment[];
   onSubmit: (data: any) => void;
   onCancel: () => void;
+  initialData?: any;
 }
 
 // ตัวเลือกตำแหน่ง (สมมติ)
 const POSITIONS = ["ผู้อำนวยการ", "รองผู้อำนวยการ", "หัวหน้าสาขา", "หัวหน้างาน", "ครู", "เจ้าหน้าที่"];
 
-export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: BookingFormProps) {
+export default function BookingForm({ rooms, equipments, onSubmit, onCancel, initialData }: BookingFormProps) {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [existingBookings, setExistingBookings] = useState<Booking[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
@@ -47,18 +48,18 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
   const user = userStr ? JSON.parse(userStr) : null;
 
   const [formData, setFormData] = useState({
-    bookerName: user?.fullName || "",
-    department: "",
-    position: "",
-    phone: "",
-    roomId: "",
-    date: "",
-    participants: 1,
-    startTime: "",
-    endTime: "",
-    roomSetup: "", // open_space, u_shape, classroom
-    equipments: [] as string[],
-    purpose: "",
+    bookerName: initialData?.bookerName || user?.fullName || "",
+    department: initialData?.department?.id || initialData?.department || "",
+    position: initialData?.position || "",
+    phone: initialData?.phone || "",
+    roomId: initialData?.roomId || initialData?.room?.id || "",
+    date: initialData?.startTime ? initialData.startTime.split('T')[0] : "",
+    participants: initialData?.participants || 1,
+    startTime: initialData?.startTime ? new Date(initialData.startTime).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false }) : "",
+    endTime: initialData?.endTime ? new Date(initialData.endTime).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false }) : "",
+    roomSetup: initialData?.roomSetup || "", 
+    equipments: initialData?.equipments?.map((e: any) => e.equipmentId || e.id) || [] as string[],
+    purpose: initialData?.purpose || "",
   });
 
   useEffect(() => {
@@ -67,8 +68,8 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
         const response = await departmentService.getAllDepartments();
         setDepartments(response.data);
         
-        // พยายามจับคู่แผนกของผู้ใช้
-        if (user?.departmentId) {
+        // พยายามจับคู่แผนกของผู้ใช้ (ถ้าไม่มี initialData)
+        if (user?.departmentId && !initialData?.department) {
           const userDept = response.data.find((d: any) => d.id === user.departmentId);
           if (userDept) {
             setFormData(prev => ({ ...prev, department: userDept.id }));
@@ -106,7 +107,7 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
   }, [formData.roomId, formData.date]);
 
   // กรองห้องที่พร้อมใช้งาน (isActive: true)
-  const availableRooms = rooms.filter(room => room.status === "available");
+  const availableRooms = rooms.filter(room => room.isActive || room.status === 'available');
 
   // จัดการ Input ทั่วไป
   const handleChange = (
@@ -131,10 +132,6 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
     });
   };
 
-  const formatTime = (isoString: string) => {
-    return new Date(isoString).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -145,9 +142,10 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
     }
 
     // 2. ตรวจสอบเวลา
-    const now = new Date();
+    // สร้าง Date object โดยอ้างอิงจากเวลาท้องถิ่นของผู้ใช้
     const start = new Date(`${formData.date}T${formData.startTime}`);
     const end = new Date(`${formData.date}T${formData.endTime}`);
+    const now = new Date();
 
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
       Alert.error("ข้อมูลไม่ครบถ้วน", "กรุณาระบุวันที่และเวลาให้ถูกต้อง");
@@ -166,6 +164,9 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
 
     // Check for overlap with existing bookings (Client-side pre-check)
     const isOverlapping = existingBookings.some(booking => {
+      // Ignore self when editing
+      if (initialData?.id && booking.id === initialData.id) return false;
+
       const bookingStart = new Date(booking.startTime);
       const bookingEnd = new Date(booking.endTime);
       
@@ -197,8 +198,8 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
     // Transform to target JSON structure
     const payload = {
       roomId: formData.roomId,
-      startTime: start.toISOString(),
-      endTime: end.toISOString(),
+      startTime: `${formData.date}T${formData.startTime}:00`,
+      endTime: `${formData.date}T${formData.endTime}:00`,
       participants: formData.participants,
       phone: formData.phone,
       bookerName: formData.bookerName,
@@ -213,6 +214,17 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
     };
 
     onSubmit(payload);
+  };
+
+  // คำนวณวันที่ปัจจุบันในไทย (YYYY-MM-DD) สำหรับ attribute min
+  const getThaiToday = () => {
+    const now = new Date();
+    return new Intl.DateTimeFormat('fr-CA', {
+      timeZone: 'Asia/Bangkok',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(now);
   };
 
   return (
@@ -338,7 +350,7 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
               value={formData.date}
               onChange={handleChange}
               required
-              min={new Date().toISOString().split('T')[0]}
+              min={getThaiToday()}
               className="w-full rounded-2xl border border-gray-200 bg-gray-50/50 px-4 py-3.5 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white transition-all"
             />
           </div>
@@ -361,7 +373,7 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel }: B
                   <div key={booking.id} className="flex items-center justify-between bg-white p-3 rounded-xl border border-gray-200 shadow-sm text-sm">
                     <div className="flex flex-col">
                        <span className="font-bold text-gray-800">
-                        {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
+                        {new Date(booking.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })} - {new Date(booking.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
                        </span>
                        <span className="text-xs text-gray-500">โดย: {booking.bookerName || "ไม่ระบุ"}</span>
                     </div>

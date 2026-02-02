@@ -9,6 +9,7 @@ import EquipmentManagement from "./admin/EquipmentManagement";
 import PositionManagement from "./admin/PositionManagement";
 import LayoutManagement from "./admin/LayoutManagement";
 import Settings from "./admin/Settings";
+import BookingManagement from "./admin/BookingManagement";
 import Login from "./pages/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -29,6 +30,7 @@ function App() {
           <Route path="rooms" element={<RoomManagement />} />
           <Route path="rooms/new" element={<RoomForm />} />
           <Route path="rooms/:id" element={<RoomForm />} />
+          <Route path="bookings" element={<BookingManagement />} />
           <Route path="layouts" element={<LayoutManagement />} />
           <Route path="equipments" element={<EquipmentManagement />} />
           <Route path="settings" element={<Settings />} />
