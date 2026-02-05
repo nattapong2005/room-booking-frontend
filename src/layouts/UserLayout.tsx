@@ -4,10 +4,11 @@ import BookingForm from "../components/BookingForm";
 import BookingHistory from "../components/BookingHistory";
 import EditCancelBooking from "../components/EditCancelBooking";
 import { Alert } from "../utils/sweetAlert";
-import { CalendarCheck, UserCog, ChevronLeft, ChevronRight, LogIn, LogOut, User as UserIcon } from "lucide-react";
+import { CalendarCheck, UserCog, ChevronLeft, ChevronRight, LogIn, LogOut, User as UserIcon, ArrowLeft, Users, Info } from "lucide-react";
 import { roomService } from "../services/roomService";
 import { equipmentService } from "../services/equipmentService";
 import { bookingService } from "../services/bookingService";
+import api from "../utils/api";
 
 type RoomStatus = "available" | "booked";
 
@@ -18,6 +19,8 @@ export interface Room {
   status: RoomStatus;
   booking?: string;
   nextBooking?: string;
+  description?: string;
+  images?: { id: string, url: string }[];
 }
 
 const thaiMonths = [
@@ -31,9 +34,11 @@ export default function UserLayout() {
   const [activeTab, setActiveTab] = useState(0);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [allBookings, setAllBookings] = useState<any[]>([]);
-  const [equipments, setEquipments] = useState<{id: string, name: string}[]>([]);
+  const [equipments, setEquipments] = useState<{ id: string, name: string }[]>([]);
   const [loading, setLoading] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const navigate = useNavigate();
 
   const userStr = localStorage.getItem("user");
@@ -43,6 +48,30 @@ export default function UserLayout() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    let interval: any;
+    if (activeTab === 4 && selectedRoom?.images && selectedRoom.images.length > 1) {
+      interval = setInterval(() => {
+        setCurrentImageIndex((prev) => (prev === selectedRoom.images!.length - 1 ? 0 : prev + 1));
+      }, 5000);
+    }
+    return () => clearInterval(interval);
+  }, [activeTab, selectedRoom]);
+
+  const getBaseOrigin = () => {
+    try {
+      const url = new URL(api.defaults.baseURL || 'http://localhost:3000/api/v1');
+      return url.origin;
+    } catch {
+      return 'http://localhost:3000';
+    }
+  };
+
+  const getImageUrl = (url: string) => {
+    if (!url) return null;
+    return url.startsWith('http') ? url : `${getBaseOrigin()}${url}`;
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -51,13 +80,15 @@ export default function UserLayout() {
         equipmentService.getAllEquipments(),
         bookingService.getAllBookings()
       ]);
-      
+
       const fetchedRooms = roomsResponse.data.map((r: any) => ({
         id: r.id,
         name: r.name,
         capacity: `${r.capacity} คน`,
         status: r.isActive ? "available" : "booked",
         nextBooking: r.isActive ? "ไม่มีการจอง" : "ปิดปรับปรุง",
+        description: r.description,
+        images: r.images
       }));
       setRooms(fetchedRooms);
       setEquipments(equipmentsResponse.data);
@@ -82,6 +113,12 @@ export default function UserLayout() {
       return;
     }
     setActiveTab(index);
+  };
+
+  const handleRoomClick = (room: Room) => {
+    setSelectedRoom(room);
+    setCurrentImageIndex(0);
+    setActiveTab(4);
   };
 
   const tabs = [
@@ -118,13 +155,13 @@ export default function UserLayout() {
 
     for (let day = 1; day <= daysInMonth; day++) {
       const isWeekend = (firstDay + day - 1) % 7 === 0 || (firstDay + day - 1) % 7 === 6;
-      
+
       const bookingsForDay = allBookings.filter(b => {
         const bStart = new Date(b.startTime);
-        return bStart.getDate() === day && 
-               bStart.getMonth() === currentDate.getMonth() && 
-               bStart.getFullYear() === currentDate.getFullYear() &&
-               b.status !== 'CANCELLED';
+        return bStart.getDate() === day &&
+          bStart.getMonth() === currentDate.getMonth() &&
+          bStart.getFullYear() === currentDate.getFullYear() &&
+          b.status !== 'CANCELLED';
       });
 
       days.push(
@@ -139,12 +176,12 @@ export default function UserLayout() {
           </span>
           <div className="flex flex-col gap-1 overflow-y-auto max-h-[60px] md:max-h-[90px] scrollbar-hide">
             {bookingsForDay.map((booking, idx) => (
-              <div 
-                key={idx} 
+              <div
+                key={idx}
                 className={`text-[10px] md:text-xs px-1 py-0.5 rounded truncate shadow-sm border-l-2
-                  ${booking.status === 'APPROVED' ? 'bg-green-100 text-green-700 border-green-500' : 
-                    booking.status === 'PENDING' ? 'bg-amber-100 text-amber-700 border-amber-500' : 
-                    'bg-blue-100 text-blue-700 border-blue-500'}`}
+                  ${booking.status === 'APPROVED' ? 'bg-green-100 text-green-700 border-green-500' :
+                    booking.status === 'PENDING' ? 'bg-amber-100 text-amber-700 border-amber-500' :
+                      'bg-blue-100 text-blue-700 border-blue-500'}`}
                 title={`${booking.room.name}: ${booking.purpose}`}
               >
                 <span className="font-semibold">{new Date(booking.startTime).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</span> {booking.room.name}
@@ -164,7 +201,7 @@ export default function UserLayout() {
       // Ensure IDs are numbers if possible, as the backend previously expected numbers
       const roomIdNum = Number(data.roomId);
       const departmentIdNum = Number(data.department);
-      
+
       const payload = {
         ...data,
         roomId: isNaN(roomIdNum) ? data.roomId : roomIdNum,
@@ -202,7 +239,7 @@ export default function UserLayout() {
                 <p className="text-blue-100 text-sm md:text-lg font-medium opacity-90">ระบบจองห้องประชุมออนไลน์</p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2 md:gap-3">
               {user ? (
                 <div className="flex items-center gap-2">
@@ -212,7 +249,7 @@ export default function UserLayout() {
                   </div>
                   <div className="flex gap-2">
                     {user.role === 'ADMIN' && (
-                      <button 
+                      <button
                         onClick={() => navigate("/admin")}
                         className="bg-indigo-500 hover:bg-indigo-600 text-white p-2 md:px-4 md:py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-lg cursor-pointer transform hover:-translate-y-0.5"
                       >
@@ -220,7 +257,7 @@ export default function UserLayout() {
                         <span className="hidden md:inline">แผงควบคุม</span>
                       </button>
                     )}
-                    <button 
+                    <button
                       onClick={handleLogout}
                       className="bg-rose-500 hover:bg-rose-600 text-white p-2 md:px-4 md:py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-lg cursor-pointer transform hover:-translate-y-0.5"
                     >
@@ -230,7 +267,7 @@ export default function UserLayout() {
                   </div>
                 </div>
               ) : (
-                <button 
+                <button
                   onClick={() => navigate("/login")}
                   className="bg-white text-[#2751ad] hover:bg-blue-50 px-6 py-2.5 rounded-full text-sm font-bold transition-all flex items-center gap-2 shadow-2xl cursor-pointer transform hover:scale-105 active:scale-95"
                 >
@@ -244,31 +281,32 @@ export default function UserLayout() {
       </header>
 
       {/* Navigation Tabs */}
-      <nav className="max-w-6xl mx-auto px-4 py-4 md:py-8">
-        <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2 md:gap-4 justify-center">
-          {tabs.map((tab, index) => (
-            <button
-              type="button"
-              key={tab.label}
-              onClick={() => handleTabChange(index)}
-              className={`px-3 md:px-8 py-2.5 md:py-4 rounded-xl font-bold text-xs md:text-base transition-all cursor-pointer shadow-sm
-                ${
-                  activeTab === index 
-                  ? "bg-white text-[#2751ad] ring-4 ring-blue-500/20 shadow-xl scale-105 z-10"
-                  : (tab.variant === "blue"
-                    ? `bg-blue-600 text-white hover:bg-blue-700`
-                    : tab.variant === "orange"
-                      ? "bg-orange-500 text-white hover:bg-orange-600"
-                      : tab.variant === "purple"
-                        ? "bg-purple-600 text-white hover:bg-purple-700"
-                        : "bg-rose-500 text-white hover:bg-rose-600")
-                }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </nav>
+      {activeTab !== 4 && (
+        <nav className="max-w-6xl mx-auto px-4 py-4 md:py-8">
+          <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2 md:gap-4 justify-center">
+            {tabs.map((tab, index) => (
+              <button
+                type="button"
+                key={tab.label}
+                onClick={() => handleTabChange(index)}
+                className={`px-3 md:px-8 py-2.5 md:py-4 rounded-xl font-bold text-xs md:text-base transition-all cursor-pointer shadow-sm
+                  ${activeTab === index
+                    ? "bg-white text-[#2751ad] ring-4 ring-blue-500/20 shadow-xl scale-105 z-10"
+                    : (tab.variant === "blue"
+                      ? `bg-blue-600 text-white hover:bg-blue-700`
+                      : tab.variant === "orange"
+                        ? "bg-orange-500 text-white hover:bg-orange-600"
+                        : tab.variant === "purple"
+                          ? "bg-purple-600 text-white hover:bg-purple-700"
+                          : "bg-rose-500 text-white hover:bg-rose-600")
+                  }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </nav>
+      )}
 
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 pb-12">
@@ -279,7 +317,7 @@ export default function UserLayout() {
                 <div className="w-2 h-8 bg-blue-600 rounded-full"></div>
                 <h2 className="text-xl md:text-3xl font-black text-gray-800 tracking-tight">สถานะห้องประชุม</h2>
               </div>
-              
+
               {loading ? (
                 <div className="flex flex-col items-center justify-center py-12 gap-4">
                   <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
@@ -288,7 +326,11 @@ export default function UserLayout() {
               ) : (
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                   {rooms.map((room) => (
-                    <div key={room.id} className="group relative bg-gray-50/50 rounded-2xl p-5 border border-gray-100 hover:bg-white hover:shadow-2xl hover:shadow-blue-900/10 transition-all duration-300">
+                    <div
+                      key={room.id}
+                      onClick={() => handleRoomClick(room)}
+                      className="group relative bg-gray-50/50 rounded-2xl p-5 border border-gray-100 hover:bg-white hover:shadow-2xl hover:shadow-blue-900/10 transition-all duration-300 cursor-pointer"
+                    >
                       <div className="flex justify-between items-start mb-4">
                         <div className="space-y-1">
                           <h3 className="font-bold text-gray-800 md:text-lg group-hover:text-blue-600 transition-colors">{room.name}</h3>
@@ -297,11 +339,10 @@ export default function UserLayout() {
                             <span>ความจุ: {room.capacity}</span>
                           </div>
                         </div>
-                        <span className={`px-4 py-1.5 rounded-full text-[10px] md:text-xs font-black uppercase tracking-wider shadow-sm border ${
-                          room.status === "available" 
-                          ? "bg-green-50 text-green-600 border-green-200" 
-                          : "bg-orange-50 text-orange-500 border-orange-200"
-                        }`}>
+                        <span className={`px-4 py-1.5 rounded-full text-[10px] md:text-xs font-black uppercase tracking-wider shadow-sm border ${room.status === "available"
+                            ? "bg-green-50 text-green-600 border-green-200"
+                            : "bg-orange-50 text-orange-500 border-orange-200"
+                          }`}>
                           {room.status === "available" ? "ว่าง" : "ถูกจอง"}
                         </span>
                       </div>
@@ -323,7 +364,7 @@ export default function UserLayout() {
                   <div className="w-2 h-8 bg-blue-600 rounded-full"></div>
                   <h2 className="text-xl md:text-3xl font-black text-gray-800 tracking-tight">ปฏิทินการจอง</h2>
                 </div>
-                
+
                 <div className="flex items-center justify-between md:justify-end gap-4">
                   <button onClick={prevMonth} className="p-2 md:px-5 md:py-2.5 rounded-xl bg-gray-100 text-gray-600 hover:bg-blue-600 hover:text-white transition-all cursor-pointer shadow-sm">
                     <ChevronLeft size={20} />
@@ -343,7 +384,7 @@ export default function UserLayout() {
                 ))}
                 {renderCalendar()}
               </div>
-              
+
               <div className="mt-8 flex flex-wrap gap-4 md:gap-6 justify-center">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-green-500 shadow-sm shadow-green-500/50"></div>
@@ -364,6 +405,120 @@ export default function UserLayout() {
         {activeTab === 1 && <BookingForm rooms={rooms} equipments={equipments} onSubmit={handleBookingSubmit} onCancel={() => setActiveTab(0)} />}
         {activeTab === 2 && <BookingHistory />}
         {activeTab === 3 && <EditCancelBooking />}
+        {activeTab === 4 && selectedRoom && (
+          <div className="space-y-6 animate-fade-in mt-8">
+            <button
+              onClick={() => setActiveTab(0)}
+              className="group flex items-center gap-2 text-gray-500 hover:text-blue-600 font-bold transition-all"
+            >
+              <div className="p-2 bg-white rounded-full shadow-sm group-hover:shadow-md transition-all">
+                <ArrowLeft size={20} />
+              </div>
+              ย้อนกลับ
+            </button>
+
+            <div className="bg-white rounded-3xl overflow-hidden shadow-xl shadow-blue-900/5 border border-gray-100">
+              <div className="relative h-64 md:h-96 bg-gray-200 group">
+                {selectedRoom.images && selectedRoom.images.length > 0 ? (
+                  <>
+                    <img
+                      src={getImageUrl(selectedRoom.images[currentImageIndex].url) || ''}
+                      alt={selectedRoom.name}
+                      className="w-full h-full object-cover transition-all duration-500"
+                    />
+                    
+                    {selectedRoom.images.length > 1 && (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCurrentImageIndex((prev) => (prev === 0 ? selectedRoom.images!.length - 1 : prev - 1));
+                          }}
+                          className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                        >
+                          <ChevronLeft size={24} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCurrentImageIndex((prev) => (prev === selectedRoom.images!.length - 1 ? 0 : prev + 1));
+                          }}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white p-2 rounded-full backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                        >
+                          <ChevronRight size={24} />
+                        </button>
+                        
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                          {selectedRoom.images.map((_, idx) => (
+                            <button
+                              key={idx}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCurrentImageIndex(idx);
+                              }}
+                              className={`w-2.5 h-2.5 rounded-full transition-all shadow-sm cursor-pointer ${
+                                currentImageIndex === idx ? "bg-white scale-110" : "bg-white/50 hover:bg-white/80"
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center">
+                        <CalendarCheck size={40} className="opacity-50" />
+                      </div>
+                      <span className="font-medium">ไม่มีรูปภาพ</span>
+                    </div>
+                  </div>
+                )}
+                <div className="absolute top-4 right-4">
+                  <span className={`px-6 py-2 rounded-full text-sm font-black uppercase tracking-wider shadow-lg backdrop-blur-md ${selectedRoom.status === "available"
+                      ? "bg-green-500/90 text-white"
+                      : "bg-orange-500/90 text-white"
+                    }`}>
+                    {selectedRoom.status === "available" ? "ว่าง" : "ถูกจอง"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-6 md:p-10">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
+                  <div>
+                    <h2 className="text-3xl md:text-4xl font-black text-gray-800 mb-2">{selectedRoom.name}</h2>
+                    <div className="flex items-center gap-3 text-gray-500">
+                      <Users size={20} />
+                      <span className="text-lg font-medium">ความจุ: {selectedRoom.capacity}</span>
+                    </div>
+                  </div>
+
+                  {selectedRoom.status === "available" && (
+                    <button
+                      onClick={() => setActiveTab(1)} // Go to booking form
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-bold shadow-lg shadow-blue-600/20 transform hover:-translate-y-1 transition-all flex items-center gap-3 justify-center"
+                    >
+                      <CalendarCheck size={24} />
+                      จองห้องประชุมนี้
+                    </button>
+                  )}
+                </div>
+
+                <div className="prose prose-blue max-w-none">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Info className="text-blue-600" size={24} />
+                    <h3 className="text-xl font-bold text-gray-800 m-0">รายละเอียด</h3>
+                  </div>
+                  <p className="text-gray-600 leading-relaxed text-lg">
+                    {selectedRoom.description || "ไม่มีรายละเอียดเพิ่มเติม"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

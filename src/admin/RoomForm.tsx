@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Alert } from "../utils/sweetAlert";
-import { Save, ArrowLeft, Upload, X } from "lucide-react";
+import { Save, ArrowLeft, Upload, X, Image as ImageIcon } from "lucide-react";
 import api from "../utils/api";
 import { roomService } from "../services/roomService";
 
@@ -31,8 +31,11 @@ export default function RoomForm() {
     isActive: true
   });
   const [loading, setLoading] = useState(false);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  
+  // State for images
+  const [existingImages, setExistingImages] = useState<RoomImage[]>([]);
+  const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
+  const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
 
   // Get the base URL for images by stripping /api/v1
   const getBaseOrigin = () => {
@@ -63,10 +66,11 @@ export default function RoomForm() {
       });
       
       if (room.images && room.images.length > 0) {
-          const fullUrl = room.images[0].url.startsWith('http') 
-            ? room.images[0].url 
-            : `${getBaseOrigin()}${room.images[0].url}`;
-          setImagePreview(fullUrl);
+          const processedImages = room.images.map(img => ({
+            ...img,
+            url: img.url.startsWith('http') ? img.url : `${getBaseOrigin()}${img.url}`
+          }));
+          setExistingImages(processedImages);
       }
     } catch (error) {
       console.error("Failed to fetch room:", error);
@@ -87,15 +91,31 @@ export default function RoomForm() {
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      // Create previews
+      const newPreviews: string[] = [];
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (reader.result) {
+            setNewImagePreviews(prev => [...prev, reader.result as string]);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+
+      setNewImageFiles(prev => [...prev, ...files]);
     }
+  };
+
+  const removeNewImage = (index: number) => {
+    setNewImageFiles(prev => prev.filter((_, i) => i !== index));
+    setNewImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeExistingImage = (id: string) => {
+    setExistingImages(prev => prev.filter(img => img.id !== id));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -115,10 +135,33 @@ export default function RoomForm() {
       submitData.append("description", formData.description || "");
       submitData.append("isActive", String(formData.isActive));
 
-      // Only append images if a new file was selected
-      // Backend RoomService will upload these and replace existing ones
-      if (imageFile) {
-        submitData.append("images", imageFile);
+      // 1. Re-upload existing images (Fetch blob -> File)
+      // This ensures we keep existing images even if the backend replaces the list
+      if (existingImages.length > 0) {
+          try {
+              const fetchPromises = existingImages.map(async (img) => {
+                  const response = await fetch(img.url);
+                  const blob = await response.blob();
+                  // Extract filename from URL or use a default
+                  const fileName = img.url.split('/').pop() || 'existing_image.jpg';
+                  return new File([blob], fileName, { type: blob.type });
+              });
+              
+              const existingFiles = await Promise.all(fetchPromises);
+              existingFiles.forEach(file => {
+                  submitData.append("images", file);
+              });
+          } catch (fetchError) {
+              console.error("Error processing existing images:", fetchError);
+              Alert.warning("คำเตือน", "ไม่สามารถประมวลผลรูปภาพเก่าบางรูปได้ อาจมีการสูญหาย");
+          }
+      }
+
+      // 2. Append new images
+      if (newImageFiles.length > 0) {
+        newImageFiles.forEach(file => {
+            submitData.append("images", file);
+        });
       }
 
       if (isEditMode) {
@@ -217,36 +260,72 @@ export default function RoomForm() {
 
             <div className="space-y-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">รูปภาพห้องประชุม</label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 transition-colors relative min-h-[240px]">
-                    {imagePreview ? (
-                        <div className="relative w-full h-full flex items-center justify-center">
-                            <img src={imagePreview} alt="Preview" className="max-h-[300px] w-full object-cover rounded-md" />
-                            <button 
-                                type="button"
-                                onClick={() => {
-                                    setImagePreview(null);
-                                    setImageFile(null);
-                                }}
-                                className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-md"
-                            >
-                                <X size={16} />
-                            </button>
+                
+                {/* Existing Images Display */}
+                {existingImages.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-xs text-gray-500 mb-2">รูปภาพปัจจุบัน ({existingImages.length} รูป)</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {existingImages.map((img) => (
+                        <div key={img.id} className="relative aspect-video rounded-lg overflow-hidden border border-gray-200 bg-gray-50 group">
+                          <img src={img.url} alt="Room" className="w-full h-full object-cover" />
+                           <button 
+                              type="button"
+                              onClick={() => removeExistingImage(img.id)}
+                              className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                              title="ลบรูปภาพนี้"
+                          >
+                              <X size={12} />
+                          </button>
                         </div>
-                    ) : (
-                        <>
-                            <Upload className="w-12 h-12 text-gray-400 mb-3" />
-                            <p className="text-sm text-gray-500 mb-2">คลิกเพื่ออัปโหลดรูปภาพ</p>
-                            <p className="text-xs text-gray-400">PNG, JPG, GIF up to 5MB</p>
-                            <input 
-                                type="file" 
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                accept="image/*"
-                                onChange={handleImageChange}
-                            />
-                        </>
-                    )}
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Upload Area */}
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 transition-colors relative min-h-[160px]">
+                    <Upload className="w-10 h-10 text-gray-400 mb-2" />
+                    <p className="text-sm text-gray-500 mb-1">คลิกเพื่ออัปโหลดรูปภาพ</p>
+                    <p className="text-xs text-gray-400">เลือกได้หลายไฟล์ (PNG, JPG)</p>
+                    <input 
+                        type="file" 
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        accept="image/*"
+                        multiple
+                        onChange={handleImageChange}
+                    />
                 </div>
-                {imageFile && <p className="text-xs text-green-600 font-medium">ไฟล์ที่เลือก: {imageFile.name}</p>}
+
+                {/* New Images Preview */}
+                {newImageFiles.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <p className="text-sm font-medium text-gray-700">รูปภาพที่เลือก ({newImageFiles.length})</p>
+                      <button 
+                        type="button" 
+                        onClick={() => { setNewImageFiles([]); setNewImagePreviews([]); }}
+                        className="text-xs text-red-500 hover:text-red-700 font-medium"
+                      >
+                        ล้างทั้งหมด
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {newImagePreviews.map((preview, index) => (
+                        <div key={index} className="relative aspect-video rounded-lg overflow-hidden border border-gray-200 bg-gray-50 group">
+                          <img src={preview} alt={`New ${index}`} className="w-full h-full object-cover" />
+                          <button 
+                              type="button"
+                              onClick={() => removeNewImage(index)}
+                              className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                          >
+                              <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
             </div>
         </div>
 

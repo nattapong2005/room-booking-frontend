@@ -119,7 +119,7 @@ export default function RoomManagement() {
                     <tr key={room.id} className="hover:bg-gray-50">
                       <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="h-10 w-16 md:h-12 md:w-20 rounded-md bg-gray-100 flex items-center justify-center text-gray-400 shrink-0 overflow-hidden border border-gray-200">
+                          <div className="h-10 w-16 md:h-32 md:w-32 rounded-md bg-gray-100 flex items-center justify-center text-gray-400 shrink-0 overflow-hidden border border-gray-200">
                             {room.images && room.images.length > 0 ? (
                                 <img 
                                     src={room.images[0].url.startsWith('http') ? room.images[0].url : `${getBaseOrigin()}${room.images[0].url}`} 
