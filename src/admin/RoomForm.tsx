@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Alert } from "../utils/sweetAlert";
-import { Save, ArrowLeft, Upload, X, Image as ImageIcon } from "lucide-react";
+import { Save, ArrowLeft, Upload, X } from "lucide-react";
 import api from "../utils/api";
 import { roomService } from "../services/roomService";
 
@@ -94,7 +94,6 @@ export default function RoomForm() {
     const files = Array.from(e.target.files || []);
     if (files.length > 0) {
       // Create previews
-      const newPreviews: string[] = [];
       files.forEach(file => {
         const reader = new FileReader();
         reader.onloadend = () => {
