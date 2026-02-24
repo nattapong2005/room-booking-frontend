@@ -3,6 +3,7 @@ import { departmentService } from "../services/departmentService";
 import { bookingService } from "../services/bookingService";
 import { layoutService } from "../services/layoutService";
 import { Alert } from "../utils/sweetAlert";
+import { useNavigate } from "react-router-dom";
 
 interface Room {
   id: string;
@@ -50,9 +51,19 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel, ini
   const [existingBookings, setExistingBookings] = useState<Booking[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
   
+  const navigate = useNavigate();
+  
   // ดึงข้อมูลผู้ใช้จาก localStorage เพื่อ pre-fill
+  const token = localStorage.getItem("token");
   const userStr = localStorage.getItem("user");
-  const user = userStr ? JSON.parse(userStr) : null;
+  const user = userStr && token ? JSON.parse(userStr) : null;
+
+  useEffect(() => {
+    if (!token || !user) {
+      Alert.warning("ไม่ได้รับอนุญาต", "กรุณาเข้าสู่ระบบก่อนทำการจองห้องประชุม");
+      navigate('/login');
+    }
+  }, [token, user, navigate]);
 
   const [formData, setFormData] = useState({
     bookerName: initialData?.bookerName || user?.fullName || "",
