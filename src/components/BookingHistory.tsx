@@ -53,7 +53,7 @@ export default function BookingHistory() {
           position: b.position || "-",
           department: b.departments?.name || b.department || "ไม่ระบุ",
           purpose: b.purpose || "-",
-          roomSetup: b.roomSetup || "-",
+          roomSetup: b.roomLayout?.name || b.roomLayoutId || "-",
           equipments: b.equipments || [],
           status: (b.status || "pending").toLowerCase(),
         };

@@ -239,7 +239,7 @@ export default function BookingManagement() {
                     <th className="px-4 md:px-6 py-3 text-left text-[11px] md:text-xs font-medium text-gray-500 uppercase tracking-wider">
                       สถานะ
                     </th>
-                    <th className="px-4 md:px-6 py-3 text-left text-[11px] md:text-xs font-medium text-gray-500 uppercase tracking-wider text-center">
+                    <th className="px-4 md:px-6 py-3 text-left text-[11px] md:text-xs font-medium text-gray-500 uppercase tracking-wider ">
                       จัดการ
                     </th>
                   </tr>
@@ -276,7 +276,7 @@ export default function BookingManagement() {
                             <div className="flex items-center gap-2">
                               <MapPin size={16} className="text-gray-400" />
                               <span className="text-sm text-gray-900">
-                                {booking.room?.name || "Unknown Room"}
+                                {booking.room?.name || rooms.find(r => r.id === booking.roomId)?.name || "Unknown Room"}
                               </span>
                             </div>
                           </td>

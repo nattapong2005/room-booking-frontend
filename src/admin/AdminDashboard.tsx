@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Alert } from '../utils/sweetAlert';
 import { bookingService } from '../services/bookingService';
+import { roomService } from '../services/roomService';
 
 export interface BookingRequest {
   id: string;
@@ -28,14 +29,24 @@ export default function AdminDashboard() {
   const fetchRequests = async () => {
     try {
       setLoading(true);
-      const response = await bookingService.getAllBookings();
+      const [bookingsRes, roomsRes] = await Promise.all([
+        bookingService.getAllBookings(),
+        roomService.getAllRooms()
+      ]);
+      
+      const rooms = roomsRes.data;
+      
       // Backend returns array of Booking
-      const mappedRequests: BookingRequest[] = response.data.map((b: any) => {
+      const mappedRequests: BookingRequest[] = bookingsRes.data.map((b: any) => {
         const start = new Date(b.startTime);
         const end = new Date(b.endTime);
+        
+        // Find room name from relation or fallback to rooms list
+        const roomName = b.room?.name || rooms.find((r: any) => r.id === b.roomId)?.name || 'Unknown Room';
+
         return {
           id: b.id,
-          roomName: b.room?.name || 'Unknown Room',
+          roomName: roomName,
           userName: b.bookerName || b.user?.fullName || 'Unknown User',
           department: b.departments?.name || b.department || b.user?.role || '-',
           date: start.toLocaleDateString('th-TH'),

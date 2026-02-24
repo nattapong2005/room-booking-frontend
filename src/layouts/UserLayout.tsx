@@ -175,18 +175,21 @@ export default function UserLayout() {
             {day}
           </span>
           <div className="flex flex-col gap-1 overflow-y-auto max-h-[60px] md:max-h-[90px] scrollbar-hide">
-            {bookingsForDay.map((booking, idx) => (
-              <div
-                key={idx}
-                className={`text-[10px] md:text-xs px-1 py-0.5 rounded truncate shadow-sm border-l-2
+            {bookingsForDay.map((booking, idx) => {
+              const roomName = booking.room?.name || rooms.find(r => r.id === booking.roomId)?.name || 'N/A';
+              return (
+                <div
+                  key={idx}
+                  className={`text-[10px] md:text-xs px-1 py-0.5 rounded truncate shadow-sm border-l-2
                   ${booking.status === 'APPROVED' ? 'bg-green-100 text-green-700 border-green-500' :
-                    booking.status === 'PENDING' ? 'bg-amber-100 text-amber-700 border-amber-500' :
-                      'bg-blue-100 text-blue-700 border-blue-500'}`}
-                title={`${booking.room.name}: ${booking.purpose}`}
-              >
-                <span className="font-semibold">{new Date(booking.startTime).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</span> {booking.room.name}
-              </div>
-            ))}
+                      booking.status === 'PENDING' ? 'bg-amber-100 text-amber-700 border-amber-500' :
+                        'bg-blue-100 text-blue-700 border-blue-500'}`}
+                  title={`${roomName}: ${booking.purpose}`}
+                >
+                  <span className="font-semibold">{new Date(booking.startTime).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</span> {roomName}
+                </div>
+              );
+            })}
           </div>
         </div>
       );
@@ -198,23 +201,7 @@ export default function UserLayout() {
     try {
       console.log("Booking Data from Form:", data);
 
-      // Ensure IDs are numbers if possible, as the backend previously expected numbers
-      const roomIdNum = Number(data.roomId);
-      const departmentIdNum = Number(data.department);
-
-      const payload = {
-        ...data,
-        roomId: isNaN(roomIdNum) ? data.roomId : roomIdNum,
-        department: isNaN(departmentIdNum) ? data.department : departmentIdNum,
-        equipments: data.equipments.map((eq: any) => ({
-          ...eq,
-          equipmentId: !isNaN(Number(eq.equipmentId)) ? Number(eq.equipmentId) : eq.equipmentId
-        }))
-      };
-
-      console.log("Final Booking Payload:", payload);
-
-      await bookingService.createBooking(payload);
+      await bookingService.createBooking(data);
       Alert.success("บันทึกสำเร็จ", "การจองของคุณถูกบันทึกเรียบร้อยแล้ว");
       fetchData(); // Refresh calendar
       setActiveTab(0);

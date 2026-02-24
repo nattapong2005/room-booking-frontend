@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { departmentService } from "../services/departmentService";
 import { bookingService } from "../services/bookingService";
+import { layoutService } from "../services/layoutService";
 import { Alert } from "../utils/sweetAlert";
 
 interface Room {
@@ -15,6 +16,11 @@ interface Equipment {
 }
 
 interface Department {
+  id: string;
+  name: string;
+}
+
+interface Layout {
   id: string;
   name: string;
 }
@@ -40,6 +46,7 @@ const POSITIONS = ["ผู้อำนวยการ", "รองผู้อ�
 
 export default function BookingForm({ rooms, equipments, onSubmit, onCancel, initialData }: BookingFormProps) {
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [layouts, setLayouts] = useState<Layout[]>([]);
   const [existingBookings, setExistingBookings] = useState<Booking[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
   
@@ -57,29 +64,34 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel, ini
     participants: initialData?.participants || 1,
     startTime: initialData?.startTime ? new Date(initialData.startTime).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false }) : "",
     endTime: initialData?.endTime ? new Date(initialData.endTime).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false }) : "",
-    roomSetup: initialData?.roomSetup || "", 
+    roomLayoutId: initialData?.roomLayoutId || "", 
     equipments: initialData?.equipments?.map((e: any) => e.equipmentId || e.id) || [] as string[],
     purpose: initialData?.purpose || "",
   });
 
   useEffect(() => {
-    const fetchDepartments = async () => {
+    const fetchInitialData = async () => {
       try {
-        const response = await departmentService.getAllDepartments();
-        setDepartments(response.data);
+        const [deptRes, layoutRes] = await Promise.all([
+          departmentService.getAllDepartments(),
+          layoutService.getAllLayouts()
+        ]);
+        
+        setDepartments(deptRes.data);
+        setLayouts(layoutRes.data);
         
         // พยายามจับคู่แผนกของผู้ใช้ (ถ้าไม่มี initialData)
         if (user?.departmentId && !initialData?.department) {
-          const userDept = response.data.find((d: any) => d.id === user.departmentId);
+          const userDept = deptRes.data.find((d: any) => d.id === user.departmentId);
           if (userDept) {
             setFormData(prev => ({ ...prev, department: userDept.id }));
           }
         }
       } catch (error) {
-        console.error("Failed to fetch departments:", error);
+        console.error("Failed to fetch form metadata:", error);
       }
     };
-    fetchDepartments();
+    fetchInitialData();
   }, []);
 
   useEffect(() => {
@@ -184,7 +196,7 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel, ini
     }
 
     // 3. ตรวจสอบรูปแบบการจัดที่นั่ง
-    if (!formData.roomSetup) {
+    if (!formData.roomLayoutId) {
       Alert.error("ข้อมูลไม่ครบถ้วน", "กรุณาเลือกรูปแบบการจัดที่นั่ง");
       return;
     }
@@ -197,6 +209,7 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel, ini
 
     // Transform to target JSON structure
     const payload = {
+      userId: user?.id,
       roomId: formData.roomId,
       startTime: `${formData.date}T${formData.startTime}:00`,
       endTime: `${formData.date}T${formData.endTime}:00`,
@@ -206,7 +219,7 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel, ini
       position: formData.position,
       department: formData.department,
       purpose: formData.purpose,
-      roomSetup: formData.roomSetup,
+      roomLayoutId: formData.roomLayoutId,
       equipments: formData.equipments.map((id: string) => ({
         equipmentId: id,
         quantity: 1
@@ -452,31 +465,30 @@ export default function BookingForm({ rooms, equipments, onSubmit, onCancel, ini
             รูปแบบการจัดที่นั่ง *
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {[
-              { label: "พื้นที่ว่าง (Open Space)", value: "open_space" },
-              { label: "ตัวยู (U-Shape)", value: "u_shape" },
-              { label: "ชั้นเรียน (Classroom)", value: "classroom" },
-            ].map((option) => (
+            {layouts.map((option) => (
               <label 
-                key={option.value} 
+                key={option.id} 
                 className={`flex items-center justify-center p-4 rounded-2xl border-2 transition-all cursor-pointer text-center
-                  ${formData.roomSetup === option.value 
+                  ${formData.roomLayoutId === option.id 
                     ? "border-blue-500 bg-blue-50 text-blue-700 shadow-md ring-2 ring-blue-500/20" 
                     : "border-gray-100 bg-gray-50/50 text-gray-500 hover:border-gray-200 hover:bg-white"}`}
               >
                 <input
                   type="radio"
-                  name="roomSetup"
-                  value={option.value}
-                  checked={formData.roomSetup === option.value}
+                  name="roomLayoutId"
+                  value={option.id}
+                  checked={formData.roomLayoutId === option.id}
                   onChange={handleChange}
                   required
                   className="hidden"
                 />
-                <span className="text-sm font-bold uppercase tracking-tight">{option.label}</span>
+                <span className="text-sm font-bold uppercase tracking-tight">{option.name}</span>
               </label>
             ))}
           </div>
+          {layouts.length === 0 && (
+            <p className="text-xs text-gray-400 italic">กำลังโหลดรูปแบบการจัดห้อง...</p>
+          )}
         </div>
 
         {/* อุปกรณ์ */}

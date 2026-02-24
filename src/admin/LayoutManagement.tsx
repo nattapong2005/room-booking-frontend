@@ -1,30 +1,37 @@
 import { useState, useEffect } from "react";
 import { Alert } from "../utils/sweetAlert";
-import { Plus, Trash2, Layout as LayoutIcon } from "lucide-react";
+import { Plus, Trash2, Layout as LayoutIcon, Pencil } from "lucide-react";
 import Swal from 'sweetalert2';
+import { layoutService } from "../services/layoutService";
 
 interface RoomLayout {
   id: string;
   name: string;
+  _count?: {
+    bookings: number;
+  };
 }
 
 export default function LayoutManagement() {
   const [layouts, setLayouts] = useState<RoomLayout[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchLayouts = async () => {
+    try {
+      setLoading(true);
+      const response = await layoutService.getAllLayouts();
+      setLayouts(response.data);
+    } catch (error) {
+      console.error("Failed to fetch layouts", error);
+      Alert.error("ผิดพลาด", "ไม่สามารถโหลดข้อมูลได้");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const savedLayouts = localStorage.getItem('layouts');
-    if (savedLayouts) setLayouts(JSON.parse(savedLayouts));
-    else setLayouts([
-        { id: '1', name: 'Classroom (แบบห้องเรียน)' }, 
-        { id: '2', name: 'Theater (แบบโรงละคร)' }, 
-        { id: '3', name: 'U-Shape (แบบรูปตัวยู)' },
-        { id: '4', name: 'Boardroom (แบบโต๊ะประชุมใหญ่)' }
-    ]);
+    fetchLayouts();
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem('layouts', JSON.stringify(layouts));
-  }, [layouts]);
 
   const handleAddItem = async () => {
     const { value: name } = await Swal.fire({
@@ -32,23 +39,72 @@ export default function LayoutManagement() {
       input: 'text',
       inputPlaceholder: 'ชื่อรูปแบบ (เช่น Classroom)',
       showCancelButton: true,
+      confirmButtonText: 'บันทึก',
+      cancelButtonText: 'ยกเลิก',
       inputValidator: (value) => {
         if (!value) return 'กรุณากรอกข้อมูล';
       }
     });
 
     if (name) {
-      const newItem = { id: Date.now().toString(), name };
-      setLayouts([...layouts, newItem]);
-      Alert.success('สำเร็จ', 'เพิ่มข้อมูลเรียบร้อยแล้ว');
+      try {
+        await layoutService.createLayout(name);
+        Alert.success('สำเร็จ', 'เพิ่มข้อมูลเรียบร้อยแล้ว');
+        fetchLayouts();
+      } catch (error) {
+        console.error(error);
+        Alert.error("ผิดพลาด", "ไม่สามารถเพิ่มข้อมูลได้");
+      }
     }
   };
 
-  const handleDeleteItem = async (id: string) => {
+  const handleEditItem = async (item: RoomLayout) => {
+    const { value: name } = await Swal.fire({
+      title: 'แก้ไขรูปแบบการจัดห้อง',
+      input: 'text',
+      inputValue: item.name,
+      inputPlaceholder: 'ชื่อรูปแบบ',
+      showCancelButton: true,
+      confirmButtonText: 'บันทึก',
+      cancelButtonText: 'ยกเลิก',
+      inputValidator: (value) => {
+        if (!value) return 'กรุณากรอกข้อมูล';
+      }
+    });
+
+    if (name && name !== item.name) {
+      try {
+        await layoutService.updateLayout(item.id, name);
+        Alert.success('สำเร็จ', 'แก้ไขข้อมูลเรียบร้อยแล้ว');
+        fetchLayouts();
+      } catch (error) {
+        console.error(error);
+        Alert.error("ผิดพลาด", "ไม่สามารถแก้ไขข้อมูลได้");
+      }
+    }
+  };
+
+  const handleDeleteItem = async (id: string, bookingCount?: number) => {
+      if (bookingCount && bookingCount > 0) {
+        await Swal.fire({
+          icon: 'warning',
+          title: 'ไม่สามารถลบได้',
+          text: `มีการใช้งานรูปแบบนี้ในการจอง ${bookingCount} รายการ`,
+          confirmButtonText: 'เข้าใจแล้ว'
+        });
+        return;
+      }
+
       const result = await Alert.confirm("ยืนยันการลบ", "ต้องการลบข้อมูลนี้ใช่หรือไม่?", "ลบ", true);
       if (result.isConfirmed) {
-          setLayouts(layouts.filter((i) => i.id !== id));
-          Alert.success("ลบสำเร็จ", "ข้อมูลถูกลบเรียบร้อยแล้ว");
+          try {
+            await layoutService.deleteLayout(id);
+            Alert.success("ลบสำเร็จ", "ข้อมูลถูกลบเรียบร้อยแล้ว");
+            fetchLayouts();
+          } catch (error) {
+            console.error(error);
+            Alert.error("ผิดพลาด", "ไม่สามารถลบข้อมูลได้");
+          }
       }
   };
 
@@ -61,7 +117,8 @@ export default function LayoutManagement() {
         </div>
         <button 
             onClick={handleAddItem}
-            className="w-full sm:w-auto bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 text-sm md:text-base cursor-pointer"
+            disabled={loading}
+            className="w-full sm:w-auto bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 text-sm md:text-base cursor-pointer disabled:opacity-50"
         >
           <Plus size={18} />
           เพิ่มรูปแบบ
@@ -73,11 +130,19 @@ export default function LayoutManagement() {
             <thead className="bg-gray-50">
                 <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ชื่อรูปแบบการจัดที่นั่ง</th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">การใช้งาน (ครั้ง)</th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">จัดการ</th>
                 </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-                {layouts.map((item) => (
+                {loading ? (
+                  <tr>
+                    <td colSpan={3} className="px-6 py-10 text-center text-gray-500">
+                      กำลังโหลดข้อมูล...
+                    </td>
+                  </tr>
+                ) : layouts.length > 0 ? (
+                  layouts.map((item) => (
                     <tr key={item.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
@@ -87,27 +152,44 @@ export default function LayoutManagement() {
                                 <span className="text-sm text-gray-900 font-medium">{item.name}</span>
                             </div>
                         </td>
+                        <td className="px-6 py-4 text-center text-sm text-gray-500">
+                            {item._count?.bookings || 0}
+                        </td>
                         <td className="px-6 py-4 text-right text-sm font-medium">
-                            <button 
-                                onClick={() => handleDeleteItem(item.id)}
-                                className="text-red-600 hover:text-red-900 p-2"
-                            >
-                                <Trash2 size={18} />
-                            </button>
+                            <div className="flex justify-end gap-2">
+                                <button 
+                                    onClick={() => handleEditItem(item)}
+                                    className="text-indigo-600 hover:text-indigo-900 p-2 hover:bg-indigo-50 rounded-lg transition-colors"
+                                    title="แก้ไข"
+                                >
+                                    <Pencil size={18} />
+                                </button>
+                                <button 
+                                    onClick={() => handleDeleteItem(item.id, item._count?.bookings)}
+                                    className={`p-2 rounded-lg transition-colors ${
+                                      (item._count?.bookings || 0) > 0 
+                                      ? "text-gray-400 cursor-not-allowed" 
+                                      : "text-red-600 hover:text-red-900 hover:bg-red-50"
+                                    }`}
+                                    title={(item._count?.bookings || 0) > 0 ? "ไม่สามารถลบได้เนื่องจากมีการใช้งาน" : "ลบ"}
+                                    disabled={(item._count?.bookings || 0) > 0}
+                                >
+                                    <Trash2 size={18} />
+                                </button>
+                            </div>
                         </td>
                     </tr>
-                ))}
-                {layouts.length === 0 && (
+                ))
+                ) : (
                     <tr>
-                        <td colSpan={2} className="px-6 py-4 text-center text-gray-500 text-sm">ไม่พบข้อมูล</td>
+                        <td colSpan={3} className="px-6 py-10 text-center text-gray-500 text-sm">
+                            ไม่พบข้อมูลรูปแบบการจัดห้อง
+                        </td>
                     </tr>
                 )}
             </tbody>
         </table>
       </div>
-      <p className="mt-4 text-xs text-yellow-600 bg-yellow-50 p-2 rounded border border-yellow-100 italic">
-        * หมายเหตุ: ในเวอร์ชัน Demo ข้อมูลนี้จะถูกบันทึกไว้ใน Browser ของคุณเท่านั้น
-      </p>
     </div>
   );
 }
